@@ -7,20 +7,19 @@ import useCall from '@/hooks/useCall';
 interface CallDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  type: 'audio' | 'video';
 }
 
-export const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose }) => {
+const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose, type }) => {
   const {
-    stream,
-    remoteStream,
-    callAccepted,
-    callEnded,
-    isVideo,
+    isInCall,
+    callType,
+    startCall,
     endCall,
+    error
   } = useCall();
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
 
@@ -29,27 +28,45 @@ export const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose }) => {
   const hangupSound = new Audio('/sounds/hangup-sound.mp3');
   const videoCallSound = new Audio('/sounds/video-call-sound.mp3');
 
-  // Initialisation de la vidéo locale et distante
   useEffect(() => {
-    if (localVideoRef.current && stream) {
-      localVideoRef.current.srcObject = stream;
+    if (isOpen && !isInCall) {
+      const initCall = async () => {
+        try {
+          await startCall(type);
+          if (type === 'video') {
+            videoCallSound.play();
+          } else {
+            callSound.play();
+          }
+        } catch (err) {
+          console.error('Erreur lors de l\'initialisation de l\'appel:', err);
+        }
+      };
+      initCall();
     }
-  }, [stream]);
+  }, [isOpen, isInCall, type, startCall]);
 
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+    if (localVideoRef.current && callType === 'video') {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+        })
+        .catch(err => console.error('Erreur d\'accès à la caméra:', err));
     }
-  }, [remoteStream]);
+  }, [callType]);
 
   const handleEndCall = () => {
-    hangupSound.play(); // Jouer le son de raccrochage
+    hangupSound.play();
     endCall();
     onClose();
   };
 
   const toggleMute = () => {
-    if (stream) {
+    if (localVideoRef.current?.srcObject) {
+      const stream = localVideoRef.current.srcObject as MediaStream;
       stream.getAudioTracks().forEach(track => {
         track.enabled = !track.enabled;
       });
@@ -58,7 +75,8 @@ export const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose }) => {
   };
 
   const toggleVideo = () => {
-    if (stream) {
+    if (localVideoRef.current?.srcObject) {
+      const stream = localVideoRef.current.srcObject as MediaStream;
       stream.getVideoTracks().forEach(track => {
         track.enabled = !track.enabled;
       });
@@ -66,75 +84,53 @@ export const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  useEffect(() => {
-    if (isOpen && !callEnded) {
-      if (isVideo) {
-        videoCallSound.play(); // Son pour l'appel vidéo
-      } else {
-        callSound.play(); // Son pour l'appel audio
-      }
-    }
-  }, [isOpen, callEnded, isVideo]);
-
   return (
-    <Dialog open={isOpen && !callEnded} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
           <DialogTitle>
-            {isVideo ? 'Appel vidéo' : 'Appel audio'} en cours
+            {type === 'video' ? 'Appel vidéo' : 'Appel audio'} en cours
           </DialogTitle>
           <DialogDescription>
-            {isVideo ? 'L’appel vidéo est en cours.' : 'L’appel audio est en cours.'}
+            {error ? (
+              <p className="text-red-500">{error}</p>
+            ) : (
+              <p>{type === 'video' ? 'L\'appel vidéo est en cours' : 'L\'appel audio est en cours'}</p>
+            )}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4">
-          {isVideo && (
-            <>
-              <div className="relative">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full rounded-lg bg-black"
-                />
-                <div className="absolute bottom-2 left-2 text-white text-sm">
-                  Vous
-                </div>
-              </div>
-
-              {callAccepted && (
-                <div className="relative">
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    className="w-full rounded-lg bg-black"
-                  />
-                  <div className="absolute bottom-2 left-2 text-white text-sm">
-                    Interlocuteur
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        {type === 'video' && (
+          <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute bottom-4 left-4 text-white text-sm bg-black/50 px-2 py-1 rounded">
+              Vous
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-center gap-4 mt-4">
           <Button
             variant={isMuted ? "destructive" : "default"}
             size="icon"
             onClick={toggleMute}
+            title={isMuted ? "Activer le micro" : "Couper le micro"}
           >
             {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
 
-          {isVideo && (
+          {type === 'video' && (
             <Button
               variant={isVideoEnabled ? "default" : "destructive"}
               size="icon"
               onClick={toggleVideo}
+              title={isVideoEnabled ? "Couper la vidéo" : "Activer la vidéo"}
             >
               {isVideoEnabled ? (
                 <Video className="h-4 w-4" />
@@ -148,6 +144,7 @@ export const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose }) => {
             variant="destructive"
             size="icon"
             onClick={handleEndCall}
+            title="Terminer l'appel"
           >
             <PhoneOff className="h-4 w-4" />
           </Button>

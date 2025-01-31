@@ -1,34 +1,25 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Phone, Video } from "lucide-react";
-import useCall from "@/hooks/useCall";
+import CallDialog from "@/components/call/CallDialog";
 
-const ChatHeader = ({ channel, className }: { channel: string; className?: string }) => {
+interface ChatHeaderProps {
+  channel: string;
+  className?: string;
+}
+
+const ChatHeader = ({ channel, className }: ChatHeaderProps) => {
   const [isCallDialogOpen, setIsCallDialogOpen] = useState(false);
-  const { startCall, endCall, error, callType } = useCall();
+  const [callType, setCallType] = useState<'audio' | 'video'>('audio');
 
-  const handleAudioCall = async () => {
-    try {
-      await startCall("audio");
-      setIsCallDialogOpen(true);
-    } catch (err) {
-      console.error('Erreur lors du démarrage de l\'appel audio:', err);
-    }
+  const handleAudioCall = () => {
+    setCallType('audio');
+    setIsCallDialogOpen(true);
   };
 
-  const handleVideoCall = async () => {
-    try {
-      await startCall("video");
-      setIsCallDialogOpen(true);
-    } catch (err) {
-      console.error('Erreur lors du démarrage de l\'appel vidéo:', err);
-    }
-  };
-
-  const handleEndCall = () => {
-    endCall();
-    setIsCallDialogOpen(false);
+  const handleVideoCall = () => {
+    setCallType('video');
+    setIsCallDialogOpen(true);
   };
 
   return (
@@ -38,39 +29,31 @@ const ChatHeader = ({ channel, className }: { channel: string; className?: strin
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={handleAudioCall}>
-          <Phone className="h-4 w-4" />
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleAudioCall}
+          title="Démarrer un appel audio"
+        >
+          <Phone className="h-4 w-4 mr-2" />
           Appel
         </Button>
 
-        <Button variant="ghost" size="sm" onClick={handleVideoCall}>
-          <Video className="h-4 w-4" />
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleVideoCall}
+          title="Démarrer un appel vidéo"
+        >
+          <Video className="h-4 w-4 mr-2" />
           Appel vidéo
         </Button>
 
-        <Dialog open={isCallDialogOpen} onOpenChange={setIsCallDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {callType === 'video' ? 'Appel vidéo' : 'Appel audio'} en cours
-              </DialogTitle>
-              <DialogDescription>
-                {error && <p className="text-red-500">{error}</p>}
-                {!error && (
-                  <p>
-                    {callType === 'video' ? 'L\'appel vidéo' : 'L\'appel'} est en cours...
-                  </p>
-                )}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex justify-center gap-4 mt-4">
-              <Button variant="destructive" onClick={handleEndCall}>
-                Fin de l'appel
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <CallDialog
+          isOpen={isCallDialogOpen}
+          onClose={() => setIsCallDialogOpen(false)}
+          type={callType}
+        />
       </div>
     </header>
   );
