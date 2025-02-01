@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { DirectMessages } from "@/components/chat/DirectMessages";
 import { UserProfile } from "@/components/profile/UserProfile";
@@ -67,6 +67,89 @@ export function Sidebar({ currentChannel, setCurrentChannel, currentView, setCur
   const SidebarContent = () => (
     <div className="pb-12 w-full">
       <div className="space-y-4 py-4">
+        {/* Menu utilisateur mobile */}
+        <div className="px-3 py-2 border-b lg:hidden">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-medium">
+              JD
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                John Doe
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                john.doe@example.com
+              </p>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-gray-100 relative"
+                >
+                  <span className="sr-only">Menu utilisateur</span>
+                  <svg
+                    className="h-4 w-4 text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                    />
+                  </svg>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                align="end" 
+                sideOffset={5}
+                className="w-56 bg-white shadow-lg border border-gray-100"
+                style={{
+                  position: 'fixed',
+                  zIndex: 9999,
+                  maxHeight: '90vh',
+                  overflowY: 'auto'
+                }}
+              >
+                <DropdownMenuItem 
+                  className="flex items-center hover:bg-gray-50"
+                  onClick={() => setShowProfile(true)}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Mon profil</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="flex items-center hover:bg-gray-50"
+                  onClick={() => setShowSettings(true)}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Paramètres</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="flex items-center hover:bg-gray-50"
+                  onClick={() => setShowNotifications(true)}
+                >
+                  <Bell className="mr-2 h-4 w-4" />
+                  <span>Notifications</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="flex items-center hover:bg-gray-50">
+                  <Moon className="mr-2 h-4 w-4" />
+                  <span>Mode sombre</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="flex items-center hover:bg-gray-50 text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Déconnexion</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
         {/* Onglets Chat/Email */}
         <div className="px-3 py-2">
           <Tabs value={currentView} className="w-full">
@@ -259,12 +342,13 @@ export function Sidebar({ currentChannel, setCurrentChannel, currentView, setCur
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
                   align="end" 
+                  sideOffset={5}
                   className="w-56 bg-white shadow-lg border border-gray-100"
                   style={{
                     position: 'fixed',
-                    zIndex: 1000,
-                    marginTop: '0.5rem',
-                    marginRight: '0.5rem'
+                    zIndex: 9999,
+                    maxHeight: '90vh',
+                    overflowY: 'auto'
                   }}
                 >
                   <DropdownMenuItem 
@@ -334,18 +418,30 @@ export function Sidebar({ currentChannel, setCurrentChannel, currentView, setCur
       {/* Dialogues pour les différentes sections */}
       <Dialog open={showProfile} onOpenChange={setShowProfile}>
         <DialogContent className="max-w-4xl">
+          <DialogTitle>Mon profil</DialogTitle>
+          <DialogDescription>
+            Gérez vos informations personnelles et vos préférences
+          </DialogDescription>
           <UserProfile />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
         <DialogContent className="max-w-4xl">
+          <DialogTitle>Paramètres</DialogTitle>
+          <DialogDescription>
+            Configurez vos paramètres d'application
+          </DialogDescription>
           <UserSettings />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
         <DialogContent className="max-w-4xl">
+          <DialogTitle>Notifications</DialogTitle>
+          <DialogDescription>
+            Gérez vos préférences de notifications
+          </DialogDescription>
           <NotificationSettings />
         </DialogContent>
       </Dialog>

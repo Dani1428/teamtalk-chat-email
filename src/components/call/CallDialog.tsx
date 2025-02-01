@@ -48,18 +48,38 @@ const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose, type }) => {
 
   useEffect(() => {
     if (localVideoRef.current && callType === 'video') {
-      navigator.mediaDevices.getUserMedia({ video: true })
+      navigator.mediaDevices.getUserMedia({ 
+        video: true,
+        audio: true // Adding audio to ensure we have both streams
+      })
         .then(stream => {
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
+            // Ensure autoplay is enabled
+            localVideoRef.current.play().catch(e => console.error('Error playing video:', e));
           }
         })
-        .catch(err => console.error('Erreur d\'accès à la caméra:', err));
+        .catch(err => {
+          console.error('Erreur d\'accès aux périphériques:', err);
+          onClose(); // Close the dialog if we can't access the media devices
+        });
+
+      // Cleanup function to stop all tracks when component unmounts
+      return () => {
+        if (localVideoRef.current?.srcObject) {
+          const stream = localVideoRef.current.srcObject as MediaStream;
+          stream.getTracks().forEach(track => track.stop());
+        }
+      };
     }
-  }, [callType]);
+  }, [callType, onClose]);
 
   const handleEndCall = () => {
-    hangupSound.play();
+    if (localVideoRef.current?.srcObject) {
+      const stream = localVideoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+    }
+    hangupSound.play().catch(e => console.error('Error playing hangup sound:', e));
     endCall();
     onClose();
   };
@@ -67,7 +87,8 @@ const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose, type }) => {
   const toggleMute = () => {
     if (localVideoRef.current?.srcObject) {
       const stream = localVideoRef.current.srcObject as MediaStream;
-      stream.getAudioTracks().forEach(track => {
+      const audioTracks = stream.getAudioTracks();
+      audioTracks.forEach(track => {
         track.enabled = !track.enabled;
       });
       setIsMuted(!isMuted);
@@ -77,7 +98,8 @@ const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose, type }) => {
   const toggleVideo = () => {
     if (localVideoRef.current?.srcObject) {
       const stream = localVideoRef.current.srcObject as MediaStream;
-      stream.getVideoTracks().forEach(track => {
+      const videoTracks = stream.getVideoTracks();
+      videoTracks.forEach(track => {
         track.enabled = !track.enabled;
       });
       setIsVideoEnabled(!isVideoEnabled);
@@ -92,62 +114,54 @@ const CallDialog: React.FC<CallDialogProps> = ({ isOpen, onClose, type }) => {
             {type === 'video' ? 'Appel vidéo' : 'Appel audio'} en cours
           </DialogTitle>
           <DialogDescription>
-            {error ? (
-              <p className="text-red-500">{error}</p>
-            ) : (
-              <p>{type === 'video' ? 'L\'appel vidéo est en cours' : 'L\'appel audio est en cours'}</p>
-            )}
+            <span className={error ? "text-red-500" : ""}>
+              {error || `${type === 'video' ? 'L\'appel vidéo est en cours' : 'L\'appel audio est en cours'}`}
+            </span>
           </DialogDescription>
         </DialogHeader>
 
-        {type === 'video' && (
-          <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute bottom-4 left-4 text-white text-sm bg-black/50 px-2 py-1 rounded">
-              Vous
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-center gap-4 mt-4">
-          <Button
-            variant={isMuted ? "destructive" : "default"}
-            size="icon"
-            onClick={toggleMute}
-            title={isMuted ? "Activer le micro" : "Couper le micro"}
-          >
-            {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
-
+        <div className="flex flex-col items-center space-y-4">
           {type === 'video' && (
-            <Button
-              variant={isVideoEnabled ? "default" : "destructive"}
-              size="icon"
-              onClick={toggleVideo}
-              title={isVideoEnabled ? "Couper la vidéo" : "Activer la vidéo"}
-            >
-              {isVideoEnabled ? (
-                <Video className="h-4 w-4" />
-              ) : (
-                <VideoOff className="h-4 w-4" />
-              )}
-            </Button>
+            <div className="relative w-full aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+            </div>
           )}
 
-          <Button
-            variant="destructive"
-            size="icon"
-            onClick={handleEndCall}
-            title="Terminer l'appel"
-          >
-            <PhoneOff className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center justify-center gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleMute}
+              className={isMuted ? "bg-red-100 hover:bg-red-200" : ""}
+            >
+              {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+
+            {type === 'video' && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleVideo}
+                className={!isVideoEnabled ? "bg-red-100 hover:bg-red-200" : ""}
+              >
+                {!isVideoEnabled ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+              </Button>
+            )}
+
+            <Button
+              variant="destructive"
+              size="icon"
+              onClick={handleEndCall}
+            >
+              <PhoneOff className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

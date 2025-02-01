@@ -1,28 +1,29 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { API_ROUTES } from '@/config/api';
+import { useDepartments } from '@/contexts/DepartmentContext';
 import { 
+  Settings, 
+  Mail, 
   Plus, 
   X, 
-  Settings, 
+  Save, 
+  RefreshCw, 
+  MoreVertical, 
   AlertCircle, 
   BarChart2, 
   CheckCircle, 
   XCircle,
-  Mail,
-  PieChart as PieChartIcon,
-  RefreshCw,
-  Save,
-  MoreVertical
+  PieChart as PieChartIcon
 } from "lucide-react";
-import { useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { useNavigate } from "react-router-dom";
 
-// Recharts imports for graph
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 interface SmtpConfig {
@@ -97,13 +98,22 @@ interface UserProfile {
 const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { 
+    departments,
+    addDepartment,
+    deleteDepartment,
+    addChannel,
+    deleteChannel,
+    selectedDepartment,
+    setSelectedDepartment 
+  } = useDepartments();
 
   const [smtpConfig, setSmtpConfig] = useState<SmtpConfig>({
-    host: "",
-    port: "",
-    username: "",
-    password: "",
-    fromEmail: ""
+    host: "smtp.zeptomail.com",
+    port: "587",
+    username: "emailapikey",
+    password: "wSsVR61+qRH5X6d1yTGpJuhtzAlRVFOkF0x73ATwvXD9SqzL8sc4wRGcBAL0SqUcFzQ/ETMT8bh9nEsD1DcLidopzAwCXCiF9mqRe1U4J3x17qnvhDzMXm5amxCOKI4OwQ9qkmlkE84m+g==",
+    fromEmail: "noreply@teamtalk.com"
   });
 
   const [emailStats, setEmailStats] = useState<EmailStats>({
@@ -113,14 +123,7 @@ const AdminDashboard = () => {
     failed: 23,
   });
 
-  const [departments, setDepartments] = useState<Department[]>([
-    { id: 1, name: "Marketing", channels: ["général", "campagnes"] },
-    { id: 2, name: "Développement", channels: ["général", "bugs", "features"] },
-    { id: 3, name: "RH", channels: ["général", "recrutement"] },
-  ]);
-
   const [newDepartment, setNewDepartment] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
   const [newChannel, setNewChannel] = useState("");
 
   const [users, setUsers] = useState<User[]>([
@@ -197,6 +200,15 @@ const AdminDashboard = () => {
     signature: "<p>Cordialement,<br/>L'équipe TeamTalk</p>"
   });
 
+  const [defaultSettings, setDefaultSettings] = useState({
+    language: 'fr',
+    theme: 'light',
+    notifications: true,
+    emailNotifications: true,
+    twoFactorAuth: false,
+    sessionTimeout: 30
+  });
+
   const [userProfiles, setUserProfiles] = useState<UserProfile>({
     defaultSettings: {
       language: "fr",
@@ -224,12 +236,53 @@ const AdminDashboard = () => {
 
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [editingRole, setEditingRole] = useState<number | null>(null);
+  const [newRole, setNewRole] = useState({
+    name: '',
+    permissions: [] as string[]
+  });
 
-  const handleSMTPSave = () => {
-    toast({
-      title: "Configuration SMTP sauvegardée",
-      description: "Les paramètres ont été mis à jour avec succès.",
-    });
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
+  const [bulkEmailContent, setBulkEmailContent] = useState({
+    subject: '',
+    message: ''
+  });
+  const [attachments, setAttachments] = useState<File[]>([]);
+
+  const handleSMTPSave = async () => {
+    try {
+      // Mode test : simuler la sauvegarde
+      // En production, décommenter le code ci-dessous
+      /*
+      const response = await fetch(API_ROUTES.settings.smtp, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(smtpConfig),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la sauvegarde de la configuration SMTP');
+      }
+      */
+
+      // Simulation de la sauvegarde réussie
+      console.log('Configuration SMTP sauvegardée:', smtpConfig);
+      
+      toast({
+        title: "Configuration sauvegardée",
+        description: "La configuration SMTP a été mise à jour avec succès.",
+      });
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde de la configuration SMTP:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la sauvegarde de la configuration SMTP.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEmailSettingsSave = () => {
@@ -239,59 +292,74 @@ const AdminDashboard = () => {
     });
   };
 
-  const handleAddDepartment = () => {
+  const handleAddDepartment = async () => {
     if (newDepartment.trim()) {
-      const newDept = {
-        id: departments.length + 1,
-        name: newDepartment.trim(),
-        channels: ["général"]
-      };
-      setDepartments([...departments, newDept]);
-      setNewDepartment("");
-      toast({
-        title: "Département ajouté",
-        description: `Le département ${newDepartment} a été créé avec succès.`
-      });
-    }
-  };
-
-  const handleDeleteDepartment = (id: number) => {
-    setDepartments(departments.filter(dept => dept.id !== id));
-    toast({
-      title: "Département supprimé",
-      description: "Le département a été supprimé avec succès."
-    });
-  };
-
-  const handleAddChannel = () => {
-    if (selectedDepartment && newChannel.trim()) {
-      setDepartments(departments.map(dept => {
-        if (dept.id === selectedDepartment) {
-          return {
-            ...dept,
-            channels: [...dept.channels, newChannel.trim()]
-          };
-        }
-        return dept;
-      }));
-      setNewChannel("");
-      toast({
-        title: "Canal ajouté",
-        description: `Le canal ${newChannel} a été ajouté avec succès.`
-      });
-    }
-  };
-
-  const handleDeleteChannel = (deptId: number, channel: string) => {
-    setDepartments(departments.map(dept => {
-      if (dept.id === deptId) {
-        return {
-          ...dept,
-          channels: dept.channels.filter(ch => ch !== channel)
-        };
+      try {
+        await addDepartment(newDepartment.trim());
+        setNewDepartment("");
+        toast({
+          title: "Département ajouté",
+          description: `Le département ${newDepartment} a été créé avec succès.`
+        });
+      } catch (error) {
+        toast({
+          title: "Erreur",
+          description: "Impossible d'ajouter le département.",
+          variant: "destructive"
+        });
       }
-      return dept;
-    }));
+    }
+  };
+
+  const handleDeleteDepartment = async (id: number) => {
+    try {
+      await deleteDepartment(id);
+      toast({
+        title: "Département supprimé",
+        description: "Le département a été supprimé avec succès."
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le département.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddChannel = async () => {
+    if (selectedDepartment && newChannel.trim()) {
+      try {
+        await addChannel(selectedDepartment, newChannel.trim());
+        setNewChannel("");
+        toast({
+          title: "Canal ajouté",
+          description: `Le canal ${newChannel} a été ajouté avec succès.`
+        });
+      } catch (error) {
+        toast({
+          title: "Erreur",
+          description: "Impossible d'ajouter le canal.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleDeleteChannel = async (deptId: number, channel: string) => {
+    try {
+      await deleteChannel(deptId, channel);
+      toast({
+        title: "Canal supprimé",
+        description: "Le canal a été supprimé avec succès."
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le canal.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleInviteUser = () => {
@@ -323,6 +391,204 @@ const AdminDashboard = () => {
       title: "Profil mis à jour",
       description: "Les modifications ont été enregistrées avec succès."
     });
+  };
+
+  const handleEditRole = (roleId: number) => {
+    setEditingRole(roleId);
+    const role = userProfiles.roles.find(r => r.id === roleId);
+    if (role) {
+      setNewRole({
+        name: role.name,
+        permissions: [...role.permissions]
+      });
+    }
+  };
+
+  const handleSaveRole = () => {
+    if (editingRole) {
+      setUserProfiles(prev => ({
+        ...prev,
+        roles: prev.roles.map(role => 
+          role.id === editingRole
+            ? { ...role, name: newRole.name, permissions: newRole.permissions }
+            : role
+        )
+      }));
+    } else {
+      // Ajouter un nouveau rôle
+      const newRoleId = Math.max(...userProfiles.roles.map(r => r.id)) + 1;
+      setUserProfiles(prev => ({
+        ...prev,
+        roles: [...prev.roles, { id: newRoleId, ...newRole }]
+      }));
+    }
+    setEditingRole(null);
+    setNewRole({ name: '', permissions: [] });
+    toast({
+      title: editingRole ? "Rôle modifié" : "Rôle ajouté",
+      description: "Les modifications ont été enregistrées avec succès."
+    });
+  };
+
+  const handleDeleteRole = (roleId: number) => {
+    setUserProfiles(prev => ({
+      ...prev,
+      roles: prev.roles.filter(role => role.id !== roleId)
+    }));
+    toast({
+      title: "Rôle supprimé",
+      description: "Le rôle a été supprimé avec succès."
+    });
+  };
+
+  const handleTogglePermission = (permission: string) => {
+    setNewRole(prev => ({
+      ...prev,
+      permissions: prev.permissions.includes(permission)
+        ? prev.permissions.filter(p => p !== permission)
+        : [...prev.permissions, permission]
+    }));
+  };
+
+  const handleBulkPasswordReset = async () => {
+    try {
+      const response = await fetch(`${API_ROUTES.users.bulkActions}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userIds: selectedUsers }),
+      });
+
+      if (!response.ok) throw new Error('Erreur lors de la réinitialisation des mots de passe');
+
+      toast({
+        title: "Mots de passe réinitialisés",
+        description: "Les mots de passe ont été réinitialisés avec succès. Les utilisateurs recevront un email avec leur nouveau mot de passe.",
+      });
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la réinitialisation des mots de passe.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSendBulkEmail = async () => {
+    try {
+      // Création d'un FormData pour envoyer les fichiers
+      const formData = new FormData();
+      formData.append('subject', bulkEmailContent.subject);
+      formData.append('message', bulkEmailContent.message);
+      
+      // Ajout des pièces jointes
+      attachments.forEach((file, index) => {
+        formData.append(`attachment${index}`, file);
+      });
+
+      // Mode test : simulation de l'envoi
+      console.log('Email à envoyer:', {
+        subject: bulkEmailContent.subject,
+        message: bulkEmailContent.message,
+        attachments: attachments.map(file => file.name)
+      });
+
+      /*
+      const response = await fetch(API_ROUTES.users.bulkEmail, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'envoi des emails');
+      }
+      */
+
+      // Réinitialisation du formulaire
+      setBulkEmailContent({ subject: '', message: '' });
+      setAttachments([]);
+
+      toast({
+        title: "Emails envoyés",
+        description: "Les emails ont été envoyés avec succès.",
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi des emails:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'envoi des emails.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBulkSettingsUpdate = async () => {
+    try {
+      const response = await fetch(API_ROUTES.users.bulkActions.settings, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userIds: selectedUsers,
+          settings: userProfiles.defaultSettings,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Erreur lors de la mise à jour des paramètres');
+
+      toast({
+        title: "Paramètres mis à jour",
+        description: "Les paramètres ont été mis à jour avec succès pour tous les utilisateurs sélectionnés.",
+      });
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la mise à jour des paramètres.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDefaultSettingsUpdate = async (updates: Partial<typeof defaultSettings>) => {
+    try {
+      const newSettings = { ...defaultSettings, ...updates };
+      setDefaultSettings(newSettings);
+
+      const response = await fetch(API_ROUTES.settings.updateDefaults, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newSettings),
+      });
+
+      if (!response.ok) throw new Error('Erreur lors de la mise à jour des paramètres');
+
+      toast({
+        title: "Paramètres mis à jour",
+        description: "Les paramètres par défaut ont été mis à jour avec succès.",
+      });
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la mise à jour des paramètres.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments(prev => [...prev, ...files]);
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   // Data for the pie chart
@@ -504,11 +770,8 @@ const AdminDashboard = () => {
                         <Label>Langue par défaut</Label>
                         <select 
                           className="w-full px-3 py-2 border rounded-md"
-                          value={userProfiles.defaultSettings.language}
-                          onChange={(e) => setUserProfiles({
-                            ...userProfiles,
-                            defaultSettings: { ...userProfiles.defaultSettings, language: e.target.value }
-                          })}
+                          value={defaultSettings.language}
+                          onChange={(e) => handleDefaultSettingsUpdate({ language: e.target.value })}
                         >
                           <option value="fr">Français</option>
                           <option value="en">English</option>
@@ -519,11 +782,8 @@ const AdminDashboard = () => {
                         <Label>Thème par défaut</Label>
                         <select 
                           className="w-full px-3 py-2 border rounded-md"
-                          value={userProfiles.defaultSettings.theme}
-                          onChange={(e) => setUserProfiles({
-                            ...userProfiles,
-                            defaultSettings: { ...userProfiles.defaultSettings, theme: e.target.value }
-                          })}
+                          value={defaultSettings.theme}
+                          onChange={(e) => handleDefaultSettingsUpdate({ theme: e.target.value })}
                         >
                           <option value="light">Clair</option>
                           <option value="dark">Sombre</option>
@@ -534,10 +794,11 @@ const AdminDashboard = () => {
                         <Label>Timeout session (minutes)</Label>
                         <Input 
                           type="number"
-                          value={userProfiles.defaultSettings.sessionTimeout}
-                          onChange={(e) => setUserProfiles({
-                            ...userProfiles,
-                            defaultSettings: { ...userProfiles.defaultSettings, sessionTimeout: parseInt(e.target.value) }
+                          min="1"
+                          max="1440"
+                          value={defaultSettings.sessionTimeout}
+                          onChange={(e) => handleDefaultSettingsUpdate({ 
+                            sessionTimeout: Math.max(1, Math.min(1440, parseInt(e.target.value) || 30))
                           })}
                         />
                       </div>
@@ -546,35 +807,29 @@ const AdminDashboard = () => {
                       <div className="flex items-center space-x-2">
                         <input 
                           type="checkbox"
-                          checked={userProfiles.defaultSettings.notifications}
-                          onChange={(e) => setUserProfiles({
-                            ...userProfiles,
-                            defaultSettings: { ...userProfiles.defaultSettings, notifications: e.target.checked }
-                          })}
+                          id="notifications"
+                          checked={defaultSettings.notifications}
+                          onChange={(e) => handleDefaultSettingsUpdate({ notifications: e.target.checked })}
                         />
-                        <Label>Activer les notifications par défaut</Label>
+                        <Label htmlFor="notifications">Activer les notifications par défaut</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <input 
                           type="checkbox"
-                          checked={userProfiles.defaultSettings.emailNotifications}
-                          onChange={(e) => setUserProfiles({
-                            ...userProfiles,
-                            defaultSettings: { ...userProfiles.defaultSettings, emailNotifications: e.target.checked }
-                          })}
+                          id="emailNotifications"
+                          checked={defaultSettings.emailNotifications}
+                          onChange={(e) => handleDefaultSettingsUpdate({ emailNotifications: e.target.checked })}
                         />
-                        <Label>Activer les notifications par email</Label>
+                        <Label htmlFor="emailNotifications">Activer les notifications par email</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <input 
                           type="checkbox"
-                          checked={userProfiles.defaultSettings.twoFactorAuth}
-                          onChange={(e) => setUserProfiles({
-                            ...userProfiles,
-                            defaultSettings: { ...userProfiles.defaultSettings, twoFactorAuth: e.target.checked }
-                          })}
+                          id="twoFactorAuth"
+                          checked={defaultSettings.twoFactorAuth}
+                          onChange={(e) => handleDefaultSettingsUpdate({ twoFactorAuth: e.target.checked })}
                         />
-                        <Label>Authentification à deux facteurs</Label>
+                        <Label htmlFor="twoFactorAuth">Authentification à deux facteurs</Label>
                       </div>
                     </div>
                   </div>
@@ -588,12 +843,20 @@ const AdminDashboard = () => {
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium">{role.name}</span>
                             <div className="flex space-x-2">
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleEditRole(role.id)}
+                              >
                                 <Settings className="w-4 h-4 mr-1" />
                                 Modifier
                               </Button>
                               {role.name !== "Admin" && (
-                                <Button variant="destructive" size="sm">
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm"
+                                  onClick={() => handleDeleteRole(role.id)}
+                                >
                                   <X className="w-4 h-4" />
                                 </Button>
                               )}
@@ -611,89 +874,190 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                       ))}
-                      <Button variant="outline" className="w-full">
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => {
+                          setEditingRole(null);
+                          setNewRole({ name: '', permissions: [] });
+                        }}
+                      >
                         <Plus className="w-4 h-4 mr-2" />
                         Ajouter un nouveau rôle
                       </Button>
                     </div>
+
+                    {/* Modal d'édition de rôle */}
+                    {(editingRole !== null || newRole.name !== '') && (
+                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                          <h3 className="text-lg font-semibold mb-4">
+                            {editingRole !== null ? "Modifier le rôle" : "Nouveau rôle"}
+                          </h3>
+                          <div className="space-y-4">
+                            <div>
+                              <Label>Nom du rôle</Label>
+                              <Input
+                                value={newRole.name}
+                                onChange={(e) => setNewRole(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="Nom du rôle"
+                              />
+                            </div>
+                            <div>
+                              <Label>Permissions</Label>
+                              <div className="mt-2 space-y-2">
+                                {userProfiles.permissions.map((permission) => (
+                                  <div key={permission.id} className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={newRole.permissions.includes(permission.id)}
+                                      onChange={() => handleTogglePermission(permission.id)}
+                                    />
+                                    <span>{permission.description}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex justify-end space-x-2 mt-4">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingRole(null);
+                                  setNewRole({ name: '', permissions: [] });
+                                }}
+                              >
+                                Annuler
+                              </Button>
+                              <Button
+                                onClick={handleSaveRole}
+                                disabled={!newRole.name || newRole.permissions.length === 0}
+                              >
+                                Enregistrer
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions en masse */}
                   <div>
                     <h4 className="font-medium mb-3">Actions en masse</h4>
                     <div className="flex space-x-2">
-                      <Button variant="outline">
+                      <Button 
+                        variant="outline"
+                        onClick={handleBulkPasswordReset}
+                        disabled={selectedUsers.length === 0}
+                      >
                         <RefreshCw className="w-4 h-4 mr-2" />
                         Réinitialiser les mots de passe
                       </Button>
-                      <Button variant="outline">
+                      <Button 
+                        variant="outline"
+                        onClick={() => setShowBulkEmailModal(true)}
+                        disabled={selectedUsers.length === 0}
+                      >
                         <Mail className="w-4 h-4 mr-2" />
                         Envoyer un email groupé
                       </Button>
-                      <Button variant="outline">
+                      <Button 
+                        variant="outline"
+                        onClick={handleBulkSettingsUpdate}
+                        disabled={selectedUsers.length === 0}
+                      >
                         <Settings className="w-4 h-4 mr-2" />
                         Mettre à jour les paramètres
                       </Button>
                     </div>
                   </div>
-                </div>
 
-                {/* Liste des utilisateurs */}
-                <div className="bg-white rounded-lg p-6 shadow-sm border">
-                  <h3 className="text-lg font-semibold mb-4">Utilisateurs ({users.length})</h3>
-                  <div className="space-y-4">
-                    {users.map((user) => (
-                      <div 
-                        key={user.id} 
-                        className="flex items-center justify-between p-4 rounded-lg border bg-gray-50 hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="relative">
-                            <img className="w-10 h-10 rounded-full" src={user.avatar} />
-                            <div 
-                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white
-                                ${user.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}
+                  {/* Liste des utilisateurs */}
+                  <div className="bg-white rounded-lg p-6 shadow-sm border">
+                    <h3 className="text-lg font-semibold mb-4">Utilisateurs ({users.length})</h3>
+                    <div className="space-y-4">
+                      {users.map((user) => (
+                        <div 
+                          key={user.id} 
+                          className="flex items-center justify-between p-4 rounded-lg border bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">{user.name}</span>
+                              <span className="text-sm text-gray-500">({user.department})</span>
+                            </div>
+                            <div className="text-sm text-gray-600">{user.email}</div>
+                            <div className="text-xs text-gray-500">
+                              {new Date(user.lastActive).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <div className="flex space-x-2">
+                              <span className={`px-2 py-1 rounded-full text-xs
+                                ${user.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-400 text-gray-700'}`}>
+                                {user.status === 'active' ? 'Actif' : 'Inactif'}
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs
+                                ${user.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {user.role}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedUser(user.id);
+                                  setEditingProfile(true);
+                                }}
+                              >
+                                <Settings className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={selectedUsers.includes(user.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUsers(prev => [...prev, user.id]);
+                                } else {
+                                  setSelectedUsers(prev => prev.filter(id => id !== user.id));
+                                }
+                              }}
                             />
                           </div>
-                          <div>
-                            <div className="font-medium">{user.name}</div>
-                            <div className="text-sm text-gray-500">{user.email}</div>
-                          </div>
                         </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="flex space-x-2">
-                            <span className={`px-2 py-1 rounded-full text-xs
-                              ${user.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                              {user.role}
-                            </span>
-                            <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                              {user.department}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => {
-                                setSelectedUser(user.id);
-                                setEditingProfile(true);
-                              }}
-                            >
-                              <Settings className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
+                </div>
+
+                {/* Liste des utilisateurs avec cases à cocher */}
+                <div className="space-y-4">
+                  {users.map((user) => (
+                    <div key={user.id} className="flex items-center space-x-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.includes(user.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedUsers(prev => [...prev, user.id]);
+                          } else {
+                            setSelectedUsers(prev => prev.filter(id => id !== user.id));
+                          }
+                        }}
+                      />
+                      {/* ... reste du contenu de l'utilisateur ... */}
+                    </div>
+                  ))}
                 </div>
               </div>
             </TabsContent>
@@ -715,17 +1079,17 @@ const AdminDashboard = () => {
                       <div>
                         <Label>Serveur SMTP</Label>
                         <Input 
-                          placeholder="smtp.example.com"
                           value={smtpConfig.host}
-                          onChange={(e) => setSmtpConfig({...smtpConfig, host: e.target.value})}
+                          onChange={(e) => setSmtpConfig({ ...smtpConfig, host: e.target.value })}
+                          placeholder="smtp.zeptomail.com"
                         />
                       </div>
                       <div>
                         <Label>Port</Label>
                         <Input 
-                          placeholder="587"
                           value={smtpConfig.port}
-                          onChange={(e) => setSmtpConfig({...smtpConfig, port: e.target.value})}
+                          onChange={(e) => setSmtpConfig({ ...smtpConfig, port: e.target.value })}
+                          placeholder="587"
                         />
                       </div>
                     </div>
@@ -733,9 +1097,9 @@ const AdminDashboard = () => {
                       <div>
                         <Label>Nom d'utilisateur</Label>
                         <Input 
-                          placeholder="user@example.com"
                           value={smtpConfig.username}
-                          onChange={(e) => setSmtpConfig({...smtpConfig, username: e.target.value})}
+                          onChange={(e) => setSmtpConfig({ ...smtpConfig, username: e.target.value })}
+                          placeholder="emailapikey"
                         />
                       </div>
                       <div>
@@ -743,19 +1107,24 @@ const AdminDashboard = () => {
                         <Input 
                           type="password"
                           value={smtpConfig.password}
-                          onChange={(e) => setSmtpConfig({...smtpConfig, password: e.target.value})}
+                          onChange={(e) => setSmtpConfig({ ...smtpConfig, password: e.target.value })}
+                          placeholder="••••••••"
                         />
                       </div>
                     </div>
                     <div>
                       <Label>Email d'envoi</Label>
                       <Input 
-                        placeholder="noreply@example.com"
+                        type="email"
                         value={smtpConfig.fromEmail}
-                        onChange={(e) => setSmtpConfig({...smtpConfig, fromEmail: e.target.value})}
+                        onChange={(e) => setSmtpConfig({ ...smtpConfig, fromEmail: e.target.value })}
+                        placeholder="noreply@teamtalk.com"
                       />
                     </div>
-                    <Button onClick={handleSMTPSave} className="w-full">
+                    <Button 
+                      className="mt-4"
+                      onClick={handleSMTPSave}
+                    >
                       <Save className="w-4 h-4 mr-2" />
                       Sauvegarder la configuration
                     </Button>

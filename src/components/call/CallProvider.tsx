@@ -1,194 +1,151 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Socket, io } from 'socket.io-client';
+import { useSocket } from '../../contexts/SocketContext';
 
 interface CallContextType {
-  makeCall: (userId: string, isVideo: boolean) => void;
-  answerCall: () => void;
-  endCall: () => void;
-  callAccepted: boolean;
-  callEnded: boolean;
-  stream: MediaStream | null;
-  call: any;
-  remoteStream: MediaStream | null;
-  isReceivingCall: boolean;
-  caller: string;
+  incomingCall: boolean;
   isVideo: boolean;
+  callerId: string | null;
+  acceptCall: () => Promise<void>;
+  rejectCall: () => void;
+  makeCall: (userId: string, isVideo: boolean) => Promise<void>;
+  endCall: () => void;
 }
 
-const CallContext = createContext<CallContextType | null>(null);
-
-export const useCall = () => {
-  const context = useContext(CallContext);
-  if (!context) {
-    throw new Error('useCall must be used within a CallProvider');
-  }
-  return context;
-};
+const CallContext = createContext<CallContextType>({
+  incomingCall: false,
+  isVideo: false,
+  callerId: null,
+  acceptCall: async () => {},
+  rejectCall: () => {},
+  makeCall: async () => {},
+  endCall: () => {},
+});
 
 export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [callAccepted, setCallAccepted] = useState(false);
-  const [callEnded, setCallEnded] = useState(false);
-  const [isReceivingCall, setIsReceivingCall] = useState(false);
-  const [caller, setCaller] = useState('');
+  const { sendMessage } = useSocket();
+  const [incomingCall, setIncomingCall] = useState(false);
   const [isVideo, setIsVideo] = useState(false);
-  const [call, setCall] = useState<any>(null);
-
-  const socket = useRef<Socket>();
-  const peerConnection = useRef<RTCPeerConnection>();
-
-  useEffect(() => {
-    socket.current = io('http://localhost:8080', {
-      transports: ['websocket', 'polling']
-    });
-
-    socket.current.on('callUser', async ({ from, offer, isVideo: videoCall }) => {
-      setCall({ from, offer });
-      setCaller(from);
-      setIsReceivingCall(true);
-      setIsVideo(videoCall);
-    });
-
-    socket.current.on('callAccepted', async ({ answer }) => {
-      const remoteDesc = new RTCSessionDescription(answer);
-      await peerConnection.current?.setRemoteDescription(remoteDesc);
-    });
-
-    socket.current.on('iceCandidateReceived', async ({ candidate }) => {
-      if (peerConnection.current && candidate) {
-        await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
-      }
-    });
-
-    return () => {
-      if (socket.current) {
-        socket.current.disconnect();
-      }
-      if (peerConnection.current) {
-        peerConnection.current.close();
-      }
-    };
-  }, []);
+  const [callerId, setCallerId] = useState<string | null>(null);
+  const peerConnection = useRef<RTCPeerConnection | null>(null);
 
   const createPeerConnection = () => {
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ],
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
     });
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        socket.current?.emit('iceCandidate', {
+        sendMessage('iceCandidate', {
+          to: callerId,
           candidate: event.candidate,
-          to: call ? call.from : caller,
         });
       }
     };
 
     pc.ontrack = (event) => {
-      setRemoteStream(event.streams[0]);
+      // Handle remote stream
+      const remoteStream = event.streams[0];
+      // Update UI with remote stream
     };
 
+    peerConnection.current = pc;
     return pc;
   };
 
-  const getMediaStream = async (video: boolean) => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video,
-        audio: true,
-      });
-      setStream(mediaStream);
-      return mediaStream;
-    } catch (err) {
-      console.error('Error accessing media devices:', err);
-      throw err;
-    }
+  const handleIncomingCall = async (from: string, offer: RTCSessionDescriptionInit, videoCall: boolean) => {
+    setCallerId(from);
+    setIsVideo(videoCall);
+    setIncomingCall(true);
+
+    const pc = createPeerConnection();
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
   };
 
-  const makeCall = async (userId: string, video: boolean) => {
+  const acceptCall = async () => {
+    if (!peerConnection.current || !callerId) return;
+
     try {
-      const mediaStream = await getMediaStream(video);
-      setIsVideo(video);
-
-      peerConnection.current = createPeerConnection();
-      mediaStream.getTracks().forEach(track => {
-        if (peerConnection.current && mediaStream) {
-          peerConnection.current.addTrack(track, mediaStream);
-        }
-      });
-
-      const offer = await peerConnection.current.createOffer();
-      await peerConnection.current.setLocalDescription(offer);
-
-      socket.current?.emit('callUser', {
-        userToCall: userId,
-        offer: peerConnection.current.localDescription,
-        from: socket.current.id,
-        isVideo: video,
-      });
-    } catch (err) {
-      console.error('Error making call:', err);
-    }
-  };
-
-  const answerCall = async () => {
-    try {
-      const mediaStream = await getMediaStream(isVideo);
-      setCallAccepted(true);
-
-      peerConnection.current = createPeerConnection();
-      mediaStream.getTracks().forEach(track => {
-        if (peerConnection.current && mediaStream) {
-          peerConnection.current.addTrack(track, mediaStream);
-        }
-      });
-
-      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(call.offer));
       const answer = await peerConnection.current.createAnswer();
       await peerConnection.current.setLocalDescription(answer);
 
-      socket.current?.emit('answerCall', {
-        answer: peerConnection.current.localDescription,
-        to: call.from,
+      sendMessage('answerCall', {
+        to: callerId,
+        answer,
       });
-    } catch (err) {
-      console.error('Error answering call:', err);
+
+      setIncomingCall(false);
+    } catch (error) {
+      console.error('Error accepting call:', error);
+    }
+  };
+
+  const rejectCall = () => {
+    if (!callerId) return;
+
+    sendMessage('endCall', { to: callerId });
+    cleanup();
+  };
+
+  const makeCall = async (userId: string, videoEnabled: boolean) => {
+    const pc = createPeerConnection();
+    setCallerId(userId);
+    setIsVideo(videoEnabled);
+
+    try {
+      if (videoEnabled) {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      } else {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      }
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      sendMessage('callUser', {
+        userToCall: userId,
+        offer,
+        isVideo: videoEnabled
+      });
+    } catch (error) {
+      console.error('Error making call:', error);
+      cleanup();
     }
   };
 
   const endCall = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
+    if (!callerId) return;
+
+    sendMessage('endCall', { to: callerId });
+    cleanup();
+  };
+
+  const cleanup = () => {
     if (peerConnection.current) {
       peerConnection.current.close();
+      peerConnection.current = null;
     }
-    setCallEnded(true);
-    setStream(null);
-    setRemoteStream(null);
-    setCallAccepted(false);
-    setIsReceivingCall(false);
-    setCaller('');
-    setCall(null);
+    setCallerId(null);
+    setIncomingCall(false);
+    setIsVideo(false);
   };
 
-  const value = {
-    makeCall,
-    answerCall,
-    endCall,
-    callAccepted,
-    callEnded,
-    stream,
-    call,
-    remoteStream,
-    isReceivingCall,
-    caller,
-    isVideo,
-  };
-
-  return <CallContext.Provider value={value}>{children}</CallContext.Provider>;
+  return (
+    <CallContext.Provider
+      value={{
+        incomingCall,
+        isVideo,
+        callerId,
+        acceptCall,
+        rejectCall,
+        makeCall,
+        endCall,
+      }}
+    >
+      {children}
+    </CallContext.Provider>
+  );
 };
+
+export const useCall = () => useContext(CallContext);

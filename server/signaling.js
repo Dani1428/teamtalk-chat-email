@@ -3,30 +3,33 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+require('dotenv').config();
+const departmentsRouter = require('./src/routes/departments');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Configuration CORS pour Express
 app.use(cors({
-  origin: "http://localhost:8080",
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
   methods: ["GET", "POST"],
   credentials: true
 }));
 
-// Créer le serveur HTTP
-const server = http.createServer(app);
-
 // Configuration Socket.IO avec CORS
+const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:8080",
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
     methods: ["GET", "POST"],
     credentials: true
   },
   pingTimeout: 60000,
   pingInterval: 25000
 });
+
+app.use(express.json());
+app.use('/api/departments', departmentsRouter);
 
 // Route de test pour vérifier que le serveur fonctionne
 app.get('/', (req, res) => {
@@ -81,6 +84,15 @@ io.on('connection', (socket) => {
   // Gérer les erreurs
   socket.on('error', (error) => {
     console.error('Erreur Socket.IO:', error);
+  });
+
+  // Gérer les départements
+  socket.on('join-department', (departmentId) => {
+    socket.join(`department-${departmentId}`);
+  });
+
+  socket.on('leave-department', (departmentId) => {
+    socket.leave(`department-${departmentId}`);
   });
 });
 

@@ -1,23 +1,30 @@
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
-import { Toaster } from "sonner";
-import Routes from "./routes";
-import { CallProvider } from "./components/call/CallProvider";
+import { CallProvider } from "@/components/call/CallProvider";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { DepartmentProvider } from '@/contexts/DepartmentContext';
+import { SocketProvider } from '@/contexts/SocketContext';
+import Routes from "@/Routes";
 
 const queryClient = new QueryClient();
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <CallProvider>
-          <BrowserRouter>
-            <Routes />
-            <Toaster richColors position="top-center" />
-          </BrowserRouter>
-        </CallProvider>
-      </TooltipProvider>
+      <ThemeProvider>
+        <SocketProvider>
+          <DepartmentProvider>
+            <CallProvider>
+              <BrowserRouter>
+                <TooltipProvider>
+                  <Routes />
+                </TooltipProvider>
+              </BrowserRouter>
+            </CallProvider>
+          </DepartmentProvider>
+        </SocketProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
