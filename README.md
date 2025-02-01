@@ -1,69 +1,167 @@
-# Welcome to your Lovable project
+# TeamTalk Sphere
 
-## Project info
+Une application de communication moderne et complète avec chat en temps réel, appels audio/vidéo, et gestion d'emails.
 
-**URL**: https://lovable.dev/projects/23e33847-742b-4c39-bc21-9ade87a143f1
+## Fonctionnalités
 
-## How can I edit this code?
+### Chat
+- 💬 Messagerie en temps réel
+- 📎 Support des pièces jointes
+- 🎤 Messages vocaux
+- 🌓 Mode sombre/clair
+- 📱 Interface responsive
 
-There are several ways of editing your application.
+### Email
+- ✉️ Composition d'emails avec éditeur riche
+- 📁 Gestion des pièces jointes
+- 👥 Support des destinataires CC
+- 🎨 Interface moderne et intuitive
+- 🌓 Support du mode sombre
 
-**Use Lovable**
+### Appels
+- 📞 Appels audio
+- 🎥 Appels vidéo
+- 🔊 Contrôle du volume
+- 🎙️ Contrôle du microphone
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/23e33847-742b-4c39-bc21-9ade87a143f1) and start prompting.
+## Technologies Utilisées
 
-Changes made via Lovable will be committed automatically to this repo.
+### Frontend
+- React avec TypeScript
+- Tailwind CSS pour le style
+- Radix UI pour les composants accessibles
+- WebRTC pour les appels audio/vidéo
+- WebSocket pour la communication en temps réel
 
-**Use your preferred IDE**
+### Backend
+- FastAPI (Python)
+- WebSocket pour le temps réel
+- Support des uploads de fichiers
+- Gestion des médias (audio/vidéo)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Structure du Projet
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```
+teamtalk-sphere/
+├── src/                      # Code source frontend
+│   ├── components/           # Composants React réutilisables
+│   │   ├── chat/            # Composants liés au chat
+│   │   ├── email/           # Composants liés aux emails
+│   │   ├── call/            # Composants liés aux appels
+│   │   └── ui/              # Composants UI génériques
+│   ├── contexts/            # Contextes React (Theme, Socket, etc.)
+│   ├── hooks/               # Hooks personnalisés
+│   ├── lib/                 # Bibliothèques et utilitaires
+│   └── utils/               # Fonctions utilitaires
+│
+├── backend/                  # Code source backend
+│   ├── app/                 # Application FastAPI
+│   │   ├── main.py         # Point d'entrée de l'API
+│   │   ├── models/         # Modèles de données
+│   │   ├── routes/         # Routes de l'API
+│   │   └── services/       # Services métier
+│   └── requirements.txt     # Dépendances Python
+│
+├── public/                  # Fichiers statiques
+│   ├── sounds/             # Sons de notification
+│   └── images/             # Images et icônes
+│
+├── uploads/                 # Dossier des fichiers uploadés
+│   ├── chat/              # Pièces jointes du chat
+│   └── email/             # Pièces jointes des emails
+│
+├── package.json            # Configuration npm et dépendances
+├── tsconfig.json          # Configuration TypeScript
+├── tailwind.config.ts     # Configuration Tailwind CSS
+└── vite.config.ts         # Configuration Vite
+```
 
-Follow these steps:
+## Organisation du Code
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Frontend
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- **components/** : Composants React organisés par fonctionnalité
+  - `chat/` : Messagerie en temps réel
+  - `email/` : Gestion des emails
+  - `call/` : Fonctionnalités d'appel
+  - `ui/` : Composants UI réutilisables
 
-# Step 3: Install the necessary dependencies.
-npm i
+- **contexts/** : Gestion de l'état global
+  - `ThemeContext` : Gestion du thème (clair/sombre)
+  - `SocketContext` : Gestion des connexions WebSocket
+  - `CallContext` : Gestion des appels audio/vidéo
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+- **hooks/** : Hooks React personnalisés
+  - `useVoiceRecorder` : Enregistrement audio
+  - `useWebRTC` : Gestion des appels
+  - `useSocket` : Communication WebSocket
+
+### Backend
+
+- **app/main.py** : Configuration principale FastAPI
+  - Routes WebSocket
+  - Gestion des fichiers
+  - API REST
+
+- **models/** : Schémas de données
+  - Messages
+  - Utilisateurs
+  - Fichiers
+
+- **services/** : Logique métier
+  - Gestion des messages
+  - Traitement des fichiers
+  - Gestion des appels
+
+## Installation
+
+1. Cloner le repository :
+```bash
+git clone <URL_DU_REPO>
+cd teamtalk-sphere
+```
+
+2. Installer les dépendances frontend :
+```bash
+cd frontend
+npm install
+```
+
+3. Installer les dépendances backend :
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+## Démarrage
+
+1. Démarrer le backend :
+```bash
+cd backend
+python -m uvicorn app.main:app --reload --port 3000
+```
+
+2. Démarrer le frontend :
+```bash
+cd frontend
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+L'application sera accessible à l'adresse : http://localhost:8080
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Configuration
 
-**Use GitHub Codespaces**
+- Le backend écoute par défaut sur le port 3000
+- Le frontend est configuré pour se connecter à `http://localhost:3000`
+- Les fichiers uploadés sont stockés dans le dossier `uploads/`
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Contribution
 
-## What technologies are used for this project?
+Les contributions sont les bienvenues ! N'hésitez pas à :
+- Signaler des bugs
+- Proposer des nouvelles fonctionnalités
+- Soumettre des pull requests
 
-This project is built with .
+## Licence
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/23e33847-742b-4c39-bc21-9ade87a143f1) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+MIT

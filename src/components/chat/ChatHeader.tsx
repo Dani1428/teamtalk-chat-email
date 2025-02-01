@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Phone, Video } from "lucide-react";
+import { Phone, Video, Sun, Moon } from "lucide-react";
 import CallDialog from "@/components/call/CallDialog";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface ChatHeaderProps {
   channel: string;
@@ -11,6 +12,7 @@ interface ChatHeaderProps {
 const ChatHeader = ({ channel, className }: ChatHeaderProps) => {
   const [isCallDialogOpen, setIsCallDialogOpen] = useState(false);
   const [callType, setCallType] = useState<'audio' | 'video'>('audio');
+  const { theme, toggleTheme } = useTheme();
 
   const handleAudioCall = () => {
     setCallType('audio');
@@ -29,11 +31,20 @@ const ChatHeader = ({ channel, className }: ChatHeaderProps) => {
       </div>
 
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleTheme}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
         <Button 
           variant="ghost" 
           size="sm" 
           onClick={handleAudioCall}
           title="Démarrer un appel audio"
+          className="text-muted-foreground hover:text-foreground"
         >
           <Phone className="h-4 w-4 mr-2" />
           Appel
@@ -44,6 +55,7 @@ const ChatHeader = ({ channel, className }: ChatHeaderProps) => {
           size="sm" 
           onClick={handleVideoCall}
           title="Démarrer un appel vidéo"
+          className="text-muted-foreground hover:text-foreground"
         >
           <Video className="h-4 w-4 mr-2" />
           Appel vidéo
