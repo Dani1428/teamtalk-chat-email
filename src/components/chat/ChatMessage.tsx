@@ -390,6 +390,32 @@ export function ChatMessage({
               onClose={() => setShowThread(false)}
             />
           )}
+
+          {/* Sélecteur d'émojis */}
+          <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 opacity-0 group-hover:opacity-100"
+              >
+                <Smile className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-2" align={alignRight ? 'end' : 'start'}>
+              <div className="flex gap-1">
+                {EMOJI_LIST.map((emoji) => (
+                  <button
+                    key={emoji}
+                    className="p-2 hover:bg-accent rounded"
+                    onClick={() => handleReaction(emoji)}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Réactions */}
@@ -407,32 +433,6 @@ export function ChatMessage({
             ))}
           </div>
         )}
-
-        {/* Sélecteur d'émojis */}
-        <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100"
-            >
-              <Smile className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-2" align={alignRight ? 'end' : 'start'}>
-            <div className="flex gap-1">
-              {EMOJI_LIST.map((emoji) => (
-                <button
-                  key={emoji}
-                  className="p-2 hover:bg-accent rounded"
-                  onClick={() => handleReaction(emoji)}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
       </div>
     </div>
   );

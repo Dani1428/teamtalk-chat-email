@@ -52,12 +52,16 @@ interface ComposeEmailProps {
   onMaximize: () => void;
   isMinimized: boolean;
   isMaximized: boolean;
+  defaultRecipient?: string;
+  defaultSubject?: string;
+  defaultContent?: string;
   template?: {
-    to?: string;
-    cc?: string;
-    subject?: string;
-    content?: string;
+    id: string;
+    name: string;
+    subject: string;
+    content: string;
   };
+  onSend: (data: any) => void;
 }
 
 export function ComposeEmail({
@@ -66,33 +70,25 @@ export function ComposeEmail({
   onMaximize,
   isMinimized,
   isMaximized,
+  defaultRecipient,
+  defaultSubject,
+  defaultContent,
   template,
+  onSend,
 }: ComposeEmailProps) {
   const [emailData, setEmailData] = useState({
-    to: template?.to || '',
-    cc: template?.cc || '',
-    subject: template?.subject || '',
-    content: template?.content || '',
+    to: defaultRecipient || '',
+    cc: '',
+    subject: defaultSubject || template?.subject || '',
+    content: defaultContent || template?.content || '',
     attachments: [] as File[],
+    scheduledDate: null as Date | null,
+    selectedGroup: null as { name: string; recipients: string[] } | null,
   });
+
   const [showScheduler, setShowScheduler] = useState(false);
-  const [showGroupEmail, setShowGroupEmail] = useState(false);
+  const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [isSending, setIsSending] = useState(false);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setEmailData(prev => ({
-      ...prev,
-      attachments: [...prev.attachments, ...files]
-    }));
-  };
-
-  const removeAttachment = (index: number) => {
-    setEmailData(prev => ({
-      ...prev,
-      attachments: prev.attachments.filter((_, i) => i !== index)
-    }));
-  };
 
   const editor = useEditor({
     extensions: [
@@ -103,78 +99,124 @@ export function ComposeEmail({
       TipTapImage,
     ],
     content: emailData.content,
+    onUpdate: ({ editor }) => {
+      setEmailData(prev => ({
+        ...prev,
+        content: editor.getHTML()
+      }));
+    },
   });
 
-  const handleSend = () => {
-    setIsSending(true);
-    // TODO: Implémenter l'envoi d'email
-    console.log({
-      to: emailData.to,
-      cc: emailData.cc,
-      subject: emailData.subject,
-      content: editor?.getHTML(),
-      attachments: emailData.attachments,
-    });
-    onClose();
-    setIsSending(false);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setEmailData(prev => ({
+        ...prev,
+        attachments: [...prev.attachments, ...newFiles]
+      }));
+    }
   };
+
+  const removeAttachment = (index: number) => {
+    setEmailData(prev => ({
+      ...prev,
+      attachments: prev.attachments.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSchedule = (date: Date) => {
+    setEmailData(prev => ({
+      ...prev,
+      scheduledDate: date
+    }));
+    setShowScheduler(false);
+  };
+
+  const handleGroupSelect = (recipients: string[], groupName?: string) => {
+    setEmailData(prev => ({
+      ...prev,
+      to: recipients.join(', '),
+      selectedGroup: groupName ? { name: groupName, recipients } : null
+    }));
+    setShowGroupSelector(false);
+  };
+
+  const handleSend = async () => {
+    try {
+      setIsSending(true);
+      await onSend({
+        ...emailData,
+        content: editor?.getHTML() || emailData.content
+      });
+      onClose();
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi:', error);
+      // TODO: Afficher une notification d'erreur
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Mise à jour du contenu de l'éditeur si le template change
+  useEffect(() => {
+    if (template && editor) {
+      editor.commands.setContent(template.content);
+    }
+  }, [template, editor]);
 
   if (isMinimized) {
     return (
-      <Dialog open={true} onOpenChange={onClose}>
-        <DialogContent className="w-80 translate-y-[calc(100vh-6rem)] translate-x-[calc(100vw-24rem)] duration-300 bg-background border">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Nouveau message</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Fenêtre de composition d'email minimisée. Cliquez pour agrandir.
-            </DialogDescription>
-            <div className="flex items-center justify-between mt-2">
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={onMinimize} aria-label="Maximiser">
-                  <Maximize2 className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fermer">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
+      <div className="fixed bottom-0 right-96 bg-background border rounded-t-lg shadow-lg w-80">
+        <div className="flex items-center justify-between p-2 border-b">
+          <span className="font-medium truncate">
+            {emailData.subject || 'Nouveau message'}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onMinimize}
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent 
-        className={cn(
-          "sm:max-w-[90vw] h-[90vh] flex flex-col bg-background border shadow-lg",
-          "dark:shadow-accent/10",
-          isMaximized && "sm:max-w-[95vw] sm:h-[95vh]"
-        )}
-      >
-        <DialogHeader>
-          <DialogTitle className="text-foreground text-xl">Nouveau message</DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            Composez votre email. Tous les champs marqués d'un * sont obligatoires.
-          </DialogDescription>
-          <div className="flex items-center justify-between mt-2">
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={onMinimize} 
-                className="hover:bg-accent/50"
-                aria-label="Minimiser"
+      <DialogContent className={cn(
+        "flex flex-col",
+        isMaximized ? "w-full h-full" : "w-[800px] h-[600px]"
+      )}>
+        <DialogHeader className="flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <DialogTitle>Nouveau message</DialogTitle>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onMinimize}
               >
                 <Minus className="h-4 w-4" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={onMaximize} 
-                className="hover:bg-accent/50"
-                aria-label={isMaximized ? "Restaurer" : "Maximiser"}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onMaximize}
               >
                 {isMaximized ? (
                   <Minimize2 className="h-4 w-4" />
@@ -182,12 +224,11 @@ export function ComposeEmail({
                   <Maximize2 className="h-4 w-4" />
                 )}
               </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={onClose} 
-                className="hover:bg-accent/50"
-                aria-label="Fermer"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onClose}
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -197,64 +238,48 @@ export function ComposeEmail({
 
         <form onSubmit={(e) => e.preventDefault()} className="flex-1 flex flex-col space-y-4 overflow-hidden">
           <div className="space-y-4 flex-shrink-0">
-            {/* En-tête avec boutons */}
-            <div className="flex justify-between items-center">
-              <div className="flex-1">
+            {/* Champs destinataires */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
                 <Label htmlFor="to" className="text-foreground font-medium">À *</Label>
-                <Input
-                  id="to"
-                  placeholder="adresse@email.com"
-                  value={emailData.to}
-                  onChange={(e) => setEmailData(prev => ({ ...prev, to: e.target.value }))}
-                  required
-                  aria-required="true"
-                  className="bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-1"
-                />
-              </div>
-              <div className="ml-4 flex items-start gap-2 pt-6">
-                <Button 
-                  type="button" 
-                  variant="outline"
+                <Button
+                  type="button"
+                  variant="ghost"
                   size="sm"
-                  onClick={() => document.getElementById('file-input')?.click()}
-                  className="whitespace-nowrap text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                  aria-label="Ajouter une pièce jointe"
+                  className="h-6"
+                  onClick={() => setShowGroupSelector(true)}
                 >
-                  <Paperclip className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Pièce jointe</span>
+                  <Users className="h-4 w-4 mr-1" />
+                  Groupe
                 </Button>
-                <Input
-                  id="file-input"
-                  type="file"
-                  onChange={handleFileChange}
-                  multiple
-                  className="hidden"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                />
               </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="cc">Cc</Label>
               <Input
-                id="cc"
-                placeholder="adresse@email.com"
-                value={emailData.cc}
-                onChange={(e) => setEmailData(prev => ({ ...prev, cc: e.target.value }))}
-                className="bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-1"
+                id="to"
+                value={emailData.to}
+                onChange={(e) => setEmailData(prev => ({ ...prev, to: e.target.value }))}
+                placeholder="exemple@domaine.com, ..."
+                required
               />
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="subject">Objet *</Label>
+            <div className="space-y-2">
+              <Label htmlFor="cc" className="text-foreground font-medium">Cc</Label>
+              <Input
+                id="cc"
+                value={emailData.cc}
+                onChange={(e) => setEmailData(prev => ({ ...prev, cc: e.target.value }))}
+                placeholder="exemple@domaine.com, ..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="subject" className="text-foreground font-medium">Objet *</Label>
               <Input
                 id="subject"
-                placeholder="Objet de l'email"
                 value={emailData.subject}
                 onChange={(e) => setEmailData(prev => ({ ...prev, subject: e.target.value }))}
+                placeholder="Entrez l'objet..."
                 required
-                aria-required="true"
-                className="bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-1"
               />
             </div>
 
@@ -264,101 +289,172 @@ export function ComposeEmail({
                 {emailData.attachments.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 bg-accent/50 rounded-md px-3 py-1 text-sm"
-                    role="listitem"
+                    className="flex items-center gap-2 px-3 py-1 bg-muted rounded-full text-sm"
                   >
                     <File className="h-4 w-4" />
-                    <span className="max-w-[150px] truncate">{file.name}</span>
+                    <span className="max-w-[200px] truncate">{file.name}</span>
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
+                      size="icon"
+                      className="h-4 w-4 ml-1 hover:bg-muted-foreground/20"
                       onClick={() => removeAttachment(index)}
-                      className="h-6 w-6 p-0 hover:bg-background/80"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3 w-3" />
                     </Button>
                   </div>
                 ))}
               </div>
             )}
+          </div>
 
-            {/* Barre d'outils de l'éditeur */}
-            <div className="flex items-center gap-1 border-b pb-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => editor?.chain().focus().toggleBold().run()}
-                className={cn("p-2", editor?.isActive('bold') && "bg-accent")}
-              >
-                <Bold className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => editor?.chain().focus().toggleItalic().run()}
-                className={cn("p-2", editor?.isActive('italic') && "bg-accent")}
-              >
-                <Italic className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => editor?.chain().focus().toggleBulletList().run()}
-                className={cn("p-2", editor?.isActive('bulletList') && "bg-accent")}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-                className={cn("p-2", editor?.isActive('orderedList') && "bg-accent")}
-              >
-                <ListOrdered className="h-4 w-4" />
-              </Button>
-            </div>
+          {/* Éditeur de texte */}
+          <div className="flex-1 min-h-0 space-y-2">
+            <Label htmlFor="message" className="text-foreground font-medium">Message *</Label>
+            <div className="border rounded-md h-full flex flex-col bg-background shadow-sm dark:shadow-accent/10">
+              {/* Barre d'outils */}
+              <div className="flex items-center gap-1 p-2 border-b">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => editor?.chain().focus().toggleBold().run()}
+                  data-active={editor?.isActive('bold')}
+                >
+                  <Bold className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => editor?.chain().focus().toggleItalic().run()}
+                  data-active={editor?.isActive('italic')}
+                >
+                  <Italic className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => editor?.chain().focus().toggleBulletList().run()}
+                  data-active={editor?.isActive('bulletList')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+                  data-active={editor?.isActive('orderedList')}
+                >
+                  <ListOrdered className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    const url = window.prompt('URL:');
+                    if (url) {
+                      editor?.chain().focus().setLink({ href: url }).run();
+                    }
+                  }}
+                  data-active={editor?.isActive('link')}
+                >
+                  <LinkIcon className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    const url = window.prompt('URL de l\'image:');
+                    if (url) {
+                      editor?.chain().focus().setImage({ src: url }).run();
+                    }
+                  }}
+                >
+                  <ImageIcon className="h-4 w-4" />
+                </Button>
+                <div className="flex-1" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => editor?.chain().focus().undo().run()}
+                >
+                  <Undo className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => editor?.chain().focus().redo().run()}
+                >
+                  <Redo className="h-4 w-4" />
+                </Button>
+              </div>
 
-            {/* Zone de texte */}
-            <div className="flex-1 min-h-[300px] relative">
-              <EditorContent 
-                editor={editor} 
-                className="prose prose-sm max-w-none h-full min-h-[300px] border rounded-md p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" 
+              {/* Zone d'édition */}
+              <EditorContent
+                editor={editor}
+                className="flex-1 overflow-y-auto p-4"
               />
             </div>
           </div>
 
           {/* Barre d'actions */}
-          <div className="flex-shrink-0 flex items-center justify-between gap-2 pt-4 border-t sticky bottom-0 bg-background p-4">
+          <div className="flex-shrink-0 flex items-center justify-between gap-2 pt-4 border-t">
             <div className="flex items-center gap-2">
+              <input
+                type="file"
+                id="attachments"
+                multiple
+                className="hidden"
+                onChange={handleFileChange}
+              />
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
-                onClick={() => setShowScheduler(true)}
+                onClick={() => document.getElementById('attachments')?.click()}
               >
-                <Clock className="h-4 w-4 mr-2" />
-                Programmer
+                <Paperclip className="h-4 w-4 mr-2" />
+                Joindre
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowGroupEmail(true)}
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Groupe
-              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline">
+                    <Clock className="h-4 w-4 mr-2" />
+                    Programmer
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={emailData.scheduledDate || undefined}
+                    onSelect={(date) => date && handleSchedule(date)}
+                    disabled={(date) =>
+                      date < new Date() || date < new Date('1900-01-01')
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-            <Button 
-              type="button"
+
+            <Button
+              type="submit"
               onClick={handleSend}
               disabled={isSending}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isSending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -370,42 +466,20 @@ export function ComposeEmail({
           </div>
         </form>
 
-        {/* Composants de dialogue */}
-        {showScheduler && (
-          <Dialog open={showScheduler} onOpenChange={() => setShowScheduler(false)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Planifier l'envoi</DialogTitle>
-                <DialogDescription>
-                  Choisissez la date et l'heure d'envoi de votre email.
-                </DialogDescription>
-              </DialogHeader>
-              <ScheduledEmail
-                isOpen={showScheduler}
-                onClose={() => setShowScheduler(false)}
-                onSchedule={() => {}}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
+        {/* Sélecteur de groupe */}
+        <GroupEmail
+          open={showGroupSelector}
+          onClose={() => setShowGroupSelector(false)}
+          onSelect={handleGroupSelect}
+        />
 
-        {showGroupEmail && (
-          <Dialog open={showGroupEmail} onOpenChange={() => setShowGroupEmail(false)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Sélectionner un groupe</DialogTitle>
-                <DialogDescription>
-                  Choisissez un groupe de destinataires pour votre email.
-                </DialogDescription>
-              </DialogHeader>
-              <GroupEmail
-                isOpen={showGroupEmail}
-                onClose={() => setShowGroupEmail(false)}
-                onSend={() => {}}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
+        {/* Programmation d'envoi */}
+        <ScheduledEmail
+          open={showScheduler}
+          onClose={() => setShowScheduler(false)}
+          onSchedule={handleSchedule}
+          currentDate={emailData.scheduledDate}
+        />
       </DialogContent>
     </Dialog>
   );

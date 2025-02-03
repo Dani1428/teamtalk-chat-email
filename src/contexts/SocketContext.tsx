@@ -47,38 +47,84 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         });
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket déconnecté');
+      ws.onclose = (event) => {
+        console.log('WebSocket déconnecté:', event);
         setConnected(false);
         setSocket(null);
 
-        // Augmenter le délai de reconnexion exponentiellement
+        // Tentative de reconnexion avec délai exponentiel
         const delay = INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
         reconnectAttempts++;
 
         toast({
           title: "Déconnecté",
-          description: `La connexion au serveur a été perdue. Tentative de reconnexion ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`,
+          description: "Tentative de reconnexion...",
           variant: "destructive"
         });
 
-        setTimeout(connectWebSocket, delay);
+        setTimeout(() => {
+          connectWebSocket();
+        }, delay);
       };
 
       ws.onerror = (error) => {
         console.error('Erreur WebSocket:', error);
+        toast({
+          title: "Erreur",
+          description: "Une erreur est survenue avec la connexion WebSocket.",
+          variant: "destructive"
+        });
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('Message reçu:', data);
+
+          // Gérer les différents types de messages
+          switch (data.type) {
+            case 'error':
+              toast({
+                title: "Erreur",
+                description: data.message,
+                variant: "destructive"
+              });
+              break;
+            case 'notification':
+              toast({
+                title: data.title,
+                description: data.message,
+              });
+              break;
+            // Ajouter d'autres cas selon les besoins
+          }
+
+          // Émettre un événement personnalisé pour que d'autres composants puissent réagir
+          const customEvent = new CustomEvent('websocket-message', {
+            detail: data
+          });
+          window.dispatchEvent(customEvent);
+        } catch (error) {
+          console.error('Erreur lors du traitement du message:', error);
+        }
       };
 
       setSocket(ws);
       return ws;
     } catch (error) {
       console.error('Erreur lors de la création du WebSocket:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'établir la connexion WebSocket.",
+        variant: "destructive"
+      });
       return null;
     }
   }, [toast]);
 
   useEffect(() => {
     const ws = connectWebSocket();
+
     return () => {
       if (ws) {
         ws.close();
@@ -87,22 +133,13 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   }, [connectWebSocket]);
 
   const sendMessage = useCallback((event: string, data: any) => {
-    if (socket?.readyState === WebSocket.OPEN) {
-      try {
-        socket.send(JSON.stringify({ event, data }));
-      } catch (error) {
-        console.error('Erreur lors de l\'envoi du message:', error);
-        toast({
-          title: "Erreur",
-          description: "Impossible d'envoyer le message au serveur.",
-          variant: "destructive"
-        });
-      }
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ event, data }));
     } else {
-      console.warn('WebSocket non connecté');
+      console.error('WebSocket non connecté');
       toast({
-        title: "Non connecté",
-        description: "Impossible d'envoyer le message : non connecté au serveur.",
+        title: "Erreur",
+        description: "Impossible d'envoyer le message : connexion perdue.",
         variant: "destructive"
       });
     }
