@@ -119,6 +119,19 @@ CREATE TABLE sessions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Table pour les messages archivés
+CREATE TABLE archived_messages (
+    id SERIAL PRIMARY KEY,
+    message_id INTEGER REFERENCES messages(id),
+    channel_id INTEGER REFERENCES channels(id),
+    user_id INTEGER REFERENCES users(id),
+    content TEXT NOT NULL,
+    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    original_sent_at TIMESTAMP,
+    archive_reason TEXT,
+    archived_by INTEGER REFERENCES users(id)
+);
+
 -- Index pour améliorer les performances
 CREATE INDEX idx_messages_channel_id ON messages(channel_id);
 CREATE INDEX idx_messages_sender_id ON messages(sender_id);
@@ -126,6 +139,9 @@ CREATE INDEX idx_channel_members_user_id ON channel_members(user_id);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX idx_calls_channel_id ON calls(channel_id);
+CREATE INDEX idx_archived_messages_channel ON archived_messages(channel_id);
+CREATE INDEX idx_archived_messages_user ON archived_messages(user_id);
+CREATE INDEX idx_archived_messages_date ON archived_messages(archived_at);
 
 -- Triggers pour mettre à jour automatiquement updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()

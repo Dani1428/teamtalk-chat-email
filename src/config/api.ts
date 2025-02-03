@@ -45,6 +45,19 @@ export const API_ROUTES = {
       settings: `${BASE_URL}/users/bulk/settings`,
     },
   },
+  chat: {
+    messages: `${BASE_URL}/chat/messages`,
+    send: `${BASE_URL}/chat/messages`,
+    edit: `${BASE_URL}/chat/messages`,
+    delete: `${BASE_URL}/chat/messages`,
+    pin: `${BASE_URL}/chat/messages/pin`,
+    reactions: `${BASE_URL}/chat/reactions`,
+  },
+  archives: {
+    list: (channelId: string) => `${BASE_URL}/archives/channel/${channelId}`,
+    archive: (messageId: number) => `${BASE_URL}/archives/message/${messageId}`,
+    restore: (archiveId: number) => `${BASE_URL}/archives/restore/${archiveId}`,
+  },
   settings: {
     smtp: `${BASE_URL}/settings/smtp`,
     email: `${BASE_URL}/settings/email`,

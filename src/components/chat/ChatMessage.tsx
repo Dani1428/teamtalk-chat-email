@@ -17,6 +17,11 @@ import {
   Pin,
   Flag,
   Save,
+  Archive,
+  Globe2,
+  PieChart,
+  Code2,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +39,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { API_ROUTES } from '@/config/api';
+import { TranslationLayer } from './TranslationLayer';
+import { PollMessage } from './PollMessage';
+import { CodeSnippet } from './CodeSnippet';
+import { ThreadView } from './ThreadView';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -68,6 +77,10 @@ export function ChatMessage({
   const [isPinned, setIsPinned] = useState(message.isPinned);
   const [isSaved, setIsSaved] = useState(message.isSaved);
   const [isEditing, setIsEditing] = useState(false);
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [showPoll, setShowPoll] = useState(false);
+  const [showCodeSnippet, setShowCodeSnippet] = useState(false);
+  const [showThread, setShowThread] = useState(false);
 
   const showAvatar = !messageGrouping || isLastInGroup;
   const showTimestamp = showTimestamps || isLastInGroup;
@@ -181,6 +194,39 @@ export function ChatMessage({
     }
   };
 
+  const handleArchive = async () => {
+    try {
+      const reason = await new Promise<string>((resolve) => {
+        const result = window.prompt('Raison de l\'archivage :');
+        resolve(result || 'Non spécifiée');
+      });
+
+      const response = await fetch(API_ROUTES.archives.archive(message.id), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason }),
+      });
+
+      if (!response.ok) throw new Error('Erreur lors de l\'archivage');
+
+      toast({
+        title: 'Message archivé',
+        description: 'Le message a été archivé avec succès',
+      });
+
+      onDelete?.(message.id);
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'archiver le message',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className={cn(
       "group relative flex gap-3 py-2 px-4 hover:bg-accent/5",
@@ -224,55 +270,126 @@ export function ChatMessage({
             {message.content}
           </div>
 
-          {/* Actions du message */}
-          <div className={cn(
-            "absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity",
-            alignRight ? 'left-full ml-2' : 'right-full mr-2',
-            "flex items-center gap-1"
-          )}>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8"
-              onClick={handleReply}
-            >
-              <Reply className="h-4 w-4" />
-            </Button>
-
+          {/* Menu contextuel */}
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 hover:bg-accent/50 focus:ring-2 focus:ring-accent"
+                >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align={alignRight ? 'end' : 'start'}>
-                <DropdownMenuItem onClick={handlePin}>
+              <DropdownMenuContent 
+                align="end" 
+                className="w-56 bg-white shadow-lg rounded-md border border-gray-200"
+              >
+                {/* Actions de base */}
+                <DropdownMenuItem onClick={handleReply} className="hover:bg-accent/10">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Répondre dans un fil
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+                
+                {/* Actions de gestion */}
+                <DropdownMenuItem onClick={handlePin} className="hover:bg-accent/10">
                   <Pin className="h-4 w-4 mr-2" />
                   {isPinned ? 'Désépingler' : 'Épingler'}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSave}>
+                
+                <DropdownMenuItem onClick={handleSave} className="hover:bg-accent/10">
                   <Save className="h-4 w-4 mr-2" />
                   {isSaved ? 'Retirer des favoris' : 'Sauvegarder'}
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleEdit}>
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Modifier
+                
+                <DropdownMenuItem onClick={handleArchive} className="hover:bg-accent/10">
+                  <Archive className="h-4 w-4 mr-2" />
+                  Archiver
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleReport}>
+
+                <DropdownMenuSeparator />
+
+                {/* Nouvelles fonctionnalités */}
+                <DropdownMenuItem onClick={() => setShowTranslation(true)} className="hover:bg-accent/10">
+                  <Globe2 className="h-4 w-4 mr-2" />
+                  Traduire
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={() => setShowPoll(true)} className="hover:bg-accent/10">
+                  <PieChart className="h-4 w-4 mr-2" />
+                  Créer un sondage
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={() => setShowCodeSnippet(true)} className="hover:bg-accent/10">
+                  <Code2 className="h-4 w-4 mr-2" />
+                  Ajouter un code
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+                
+                {/* Actions de modération */}
+                {onEdit && (
+                  <DropdownMenuItem onClick={handleEdit} className="hover:bg-accent/10">
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Modifier
+                  </DropdownMenuItem>
+                )}
+                
+                <DropdownMenuItem onClick={handleReport} className="hover:bg-accent/10">
                   <Flag className="h-4 w-4 mr-2" />
                   Signaler
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  className="text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Supprimer
-                </DropdownMenuItem>
+                
+                {onDelete && (
+                  <DropdownMenuItem 
+                    onClick={handleDelete} 
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Supprimer
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* Composants des nouvelles fonctionnalités */}
+          {showTranslation && (
+            <TranslationLayer
+              content={message.content}
+              messageId={message.id}
+              onClose={() => setShowTranslation(false)}
+            />
+          )}
+
+          {showPoll && (
+            <PollMessage
+              question={message.content}
+              options={message.pollOptions || []}
+              totalVotes={message.pollTotalVotes || 0}
+              onVote={handlePollVote}
+              onClose={() => setShowPoll(false)}
+            />
+          )}
+
+          {showCodeSnippet && (
+            <CodeSnippet
+              code={message.content}
+              language={message.codeLanguage || 'javascript'}
+              fileName={message.fileName}
+              onClose={() => setShowCodeSnippet(false)}
+            />
+          )}
+
+          {showThread && (
+            <ThreadView
+              threadId={message.id}
+              onClose={() => setShowThread(false)}
+            />
+          )}
         </div>
 
         {/* Réactions */}
